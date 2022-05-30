@@ -1,15 +1,16 @@
 package mada;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,8 +26,8 @@ public class Main {
         Path decompressPath = Paths.get("decompress.txt");
 
         // Encode input.txt
-        System.out.println(encode(inputPath, outputPath, decTabPath));
-        System.out.println(decode(outputPath, decompressPath, decTabPath));
+
+        decode(outputMadaPath, decompressMadaPath, decTabMadaPath);
     }
 
     public static String encode(Path inputPath, Path outputPath, Path decTabPath) {
@@ -69,7 +70,7 @@ public class Main {
                 codemap += String.format("%1$s:%2$s-", i, d.get((char) i));
             }
         }
-        System.out.println(codemap);
+
         codemap = codemap.substring(0, codemap.length() - 1);
         System.out.println(codemap);
         try {
@@ -89,18 +90,18 @@ public class Main {
         while (encoded.length() % 8 != 0) {
             encoded += "0";
         }
+        System.out.println("encoded: " + encoded);
+
         // transform to byte array
-        ByteBuffer bytes = ByteBuffer.allocate(encoded.length() / 8);
-
-        for (int i = 0; i < (encoded.length() / 8); i++) {
-            String b = encoded.substring(i * 8, i * 8 + 8);
+        byte[] out = new byte[encoded.length() / 8];
+        for (int i = 0; i < out.length; i++) {
+            String b = encoded.substring(i * 8, (i + 1) * 8);
             int x = Integer.parseInt(b, 2);
-            bytes.put((byte) (x & 0xFF));
+            out[i] = (byte) x;
         }
-
         // write the byte array
         try {
-            Files.write(outputPath, bytes.array(), StandardOpenOption.CREATE);
+            Files.write(outputPath, out, StandardOpenOption.CREATE);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -112,14 +113,12 @@ public class Main {
 
         // read input
         String binaryWithTrail = "";
-        try {
-            byte[] bytes = Files.readAllBytes(inputPath);
-            for (byte b : bytes) {
-                binaryWithTrail += String.format("%8s", Integer.toBinaryString(b)).replace(' ', '0');
-            }
-        } catch (IOException ex) {
-            ex.printStackTrace();
+        byte[] bytes = Read(inputPath.toString());
+        for (byte b : bytes) {
+            binaryWithTrail += String.format("%8s", Integer.toBinaryString(Byte.toUnsignedInt(b))).replace(' ', '0');
         }
+        System.out.println("RECOVER: " + binaryWithTrail);
+
         // read code map
         String decString = "";
         try {
@@ -129,21 +128,24 @@ public class Main {
         }
 
         // encoded to binary String with trailing 0
-        String binary = binaryWithTrail.substring(0, binaryWithTrail.lastIndexOf("1"));
-        System.out.println(binary);
+        String binary = binaryWithTrail.substring(0, binaryWithTrail.lastIndexOf("1") - 1);
+
         // make code map
-        String[] parts = decString.split("^(:|-).$");
+        System.out.println(decString);
+        String[] parts = decString.split(":|-");
         Map<String, Character> d = new HashMap<>();
         for (int i = 0; i < (parts.length / 2); i++) {
             d.put(parts[(i * 2) + 1], (char) Integer.parseInt(parts[i * 2]));
         }
+
+        // decode with code map
         String result = "";
         int i = 1;
         while (binary.length() > 0 && i < binary.length() - 1) {
             String c = binary.substring(0, i);
             if (d.containsKey(c)) {
                 result += d.get(c);
-                binary = binary.substring(i + 1);
+                binary = binary.substring(i);
                 i = 0;
             } else {
                 i++;
@@ -155,6 +157,33 @@ public class Main {
             e.printStackTrace();
         }
         return result;
+    }
+
+    public static void Write(byte[] out, String filename) {
+
+        try {
+            FileOutputStream fos = new FileOutputStream(filename);
+            fos.write(out);
+            fos.close();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
+    public static byte[] Read(String filename) {
+        try {
+            File file = new File(filename);
+            byte[] bFile = new byte[(int) file.length()];
+            FileInputStream fis = new FileInputStream(file);
+            fis.read(bFile);
+            fis.close();
+            return bFile;
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        return null;
     }
 
 }
